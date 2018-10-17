@@ -102,6 +102,7 @@ function getMilestonesListForProject(client, project) {
           due_on: e.due_on,
           html_url: e.html_url,
           state: e.state,
+          updated: e.updated_at,
           issues: [],
         }
       }
@@ -134,11 +135,13 @@ function getAllMilestoneIssues(client, project) {
           if(milestone) {
             milestone.issues.push({
               title: e.title,
+              body: e.body,
               repo: repo.repo,
               html_url: e.html_url,
               repository_url: e.repository_url,
               state: e.state,
-              labels: e.labels
+              labels: e.labels,
+              updated: e.updated_at
             })
           }
         }
@@ -171,8 +174,8 @@ function generateMilestonesSummary(project, options) {
   let opts = options || { useVisualProgressBars: false }
 
   let str = `#### Milestone Summary\n\n`
-  str += `| Status | Milestone | Goals | ETA |\n`
-  str += `| :---: | :--- | :---: | :---: |\n`
+  str += `| Status | Milestone | Goals | ETA | Last Updated |\n`
+  str += `| :---: | :--- | :---: | :---: | :---: |\n`
 
   str += Object.keys(project.milestones).map((k, i) => {
     const m = project.milestones[k]
@@ -188,6 +191,7 @@ function generateMilestonesSummary(project, options) {
       milestone += `| ${m.closed_issues} / ${m.total_issues} `
 
     milestone += `| ${new Date(m.due_on).toDateString()} `
+    milestone += `| ${new Date(m.updated).toDateString()} `
     milestone += `|\n`
     return milestone
   }).join('')
@@ -195,6 +199,26 @@ function generateMilestonesSummary(project, options) {
 
   return str
 }
+
+////////////
+function getTextByLine(target, line) {
+  var text = target
+  return String(text.trim().split('\n')[line - 1])
+}
+function stringToDate(_date,_format,_delimiter)
+{
+            var formatLowerCase=_format.toLowerCase();
+            var formatItems=formatLowerCase.split(_delimiter);
+            var dateItems=_date.split(_delimiter);
+            var monthIndex=formatItems.indexOf("mm");
+            var dayIndex=formatItems.indexOf("dd");
+            var yearIndex=formatItems.indexOf("yyyy");
+            var month=parseInt(dateItems[monthIndex]);
+            month-=1;
+            var formatedDate = new Date(dateItems[yearIndex],month,dateItems[dayIndex]);
+            return formatedDate;
+}
+////////////
 
 function dataToMarkdown(projects, options) {
   let opts = options || { listGoalsPerMilestone: false, displayProjectName: true, useVisualProgressBars: false }
@@ -231,17 +255,19 @@ function dataToMarkdown(projects, options) {
       milestone += `${symbols.date} &nbsp;&nbsp;**${new Date(m.due_on).toDateString()}**\n\n`
 
       if (opts.listGoalsPerMilestone) {
-        milestone += `| Status | Goal | Labels | Repository |\n`
-        milestone += `| :---: | :--- | --- | --- |\n`
+        milestone += `| Status | Goal | Labels | Summary | Date |\n`
+        milestone += `| :---: | :--- | --- | :--- | :---: |\n`
         milestone += m.issues.map((issue, idx) => {
           let text = `| ${issue.state === 'open' ? symbols.notDone : symbols.done} `
-          text += `| [${issue.title}](${issue.html_url}) `
+          text += `| [${issue.title.replace(/\|/g, "-")}](${issue.html_url}) `
           text += issue.labels.length > 0 ? `|` + issue.labels.map((label) => `\`${label.name}\``).join(', ') : "| "
-          text += `| <a href=https://github.com/${issue.repo}>${issue.repo}</a> |\n`
+          text += `| ${getTextByLine(issue.body,3).split('|')[2]} `
+          let dateString = new Date(getTextByLine(issue.body,3).split('|')[1]).toDateString()
+          text += `| ${dateString} |\n`
           return text
         }).join('') + '\n'
       } else {
-        milestone += `See [milestone goals](https://waffle.io/${roadmap.targetRepo}?milestone=${encodeURIComponent(m.title)}) for the list of goals this milestone has.`
+        milestone += `See [milestone goals](https://${roadmap.targetRepo}?milestone=${encodeURIComponent(m.title)}) for the list of goals this milestone has.`
       }
 
       milestone += `\n`
@@ -280,7 +306,7 @@ Promise.all(projects.map((project, i) => getMilestonesListForProject(client, pro
     /* FINAL OUTPUT */
     logger.debug("Output:")
 
-    console.log(`# ${organization} - Roadmap`)
+    console.log(`# ${organization} - Account Status`)
     console.log("")
     console.log(`This document describes the current status and the upcoming milestones of the ${organization} project.`)
     console.log("")
